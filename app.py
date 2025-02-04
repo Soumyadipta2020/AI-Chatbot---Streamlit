@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import openai
 import os
 
-# Set your HuggingFace API token
-os.environ["HUGGINGFACE_API_TOKEN"] = "your_huggingface_api_token"
+# Import API File
+from api.R import *
 
 # Define the default questions
 default_questions = [
