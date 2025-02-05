@@ -5,36 +5,29 @@ import matplotlib.pyplot as plt
 from openai import OpenAI
 from api import HUGGINGFACE_API_TOKEN
 
-# Define default questions to show in sidebar
-default_questions = [
-    "What are the sales trends?",
-    "Show me the customer demographics.", 
-    "What is the revenue forecast?"
-]
+# Define default questions for each business unit
+default_questions = {
+    "Business Unit 1": [
+        "What are the sales trends?",
+        "Show me the customer demographics.",
+        "What is the revenue forecast?"
+    ],
+    "Business Unit 2": [
+        "What are the product performance metrics?",
+        "Show me the market analysis.",
+        "What is the profit margin?"
+    ]
+}
 
 # Configure the Streamlit page layout
 st.set_page_config(page_title="💬 Chatbot", layout="wide")
 
-# # Add custom CSS for header styling
-# st.markdown(
-#     """
-#     <style>
-#         .header-container {
-#             top: 55px;
-#             left: 10px;
-#             z-index: 1000;
-#         }
-#     </style>
-#     <div class="header-container">
-#         <h3>💬 Chatbot</h3>
-#     </div>
-#     """,
-#     unsafe_allow_html=True,
-# )
+# Add a dropdown for selecting the business unit
+selected_business_unit = st.sidebar.selectbox("Select Business Unit:", list(default_questions.keys()))
 
-# Display default questions in sidebar
+# Display default questions in sidebar based on selected business unit
 st.sidebar.title("Default Questions:")
-for question in default_questions:
+for question in default_questions[selected_business_unit]:
     st.sidebar.code(question, language=None)
 
 # Handle file upload and data visualization
@@ -66,27 +59,22 @@ client = OpenAI(
     api_key=HUGGINGFACE_API_TOKEN
 )
 
-# Create tabs for different business units
-tabs = st.tabs(["Business Unit 1", "Business Unit 2"])
+# Display business unit header
+st.header(selected_business_unit)
 
-for i, tab in enumerate(tabs, start=1):
-    with tab:
-        # Display business unit header
-        st.header(f"Business Unit {i}")
-        # Handle question submission
-        if f"messages_{i}" not in st.session_state:
-            st.session_state[f"messages_{i}"] = [{"role": "assistant", "content": "How can I help you?"}]
-        for msg in st.session_state[f"messages_{i}"]:
-            st.chat_message(msg["role"]).write(msg["content"])
-        if prompt := st.chat_input(f"Type your question for Business Unit {i}"):
-            st.session_state[f"messages_{i}"].append({"role": "user", "content": prompt})
-            st.chat_message("user").write(prompt)
-            response = client.chat.completions.create(
-                model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B", 
-                messages=st.session_state[f"messages_{i}"], 
-                max_tokens=500
-            )
-            msg = response.choices[0].message.content
-            st.session_state[f"messages_{i}"].append({"role": "assistant", "content": msg})
-            st.chat_message("assistant").write(msg)
-            
+# Handle question submission
+if "messages" not in st.session_state:
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+for msg in st.session_state["messages"]:
+    st.chat_message(msg["role"]).write(msg["content"])
+if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
+    st.session_state["messages"].append({"role": "user", "content": prompt})
+    st.chat_message("user").write(prompt)
+    response = client.chat.completions.create(
+        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+        messages=st.session_state["messages"],
+        max_tokens=500
+    )
+    msg = response.choices[0].message.content
+    st.session_state["messages"].append({"role": "assistant", "content": msg})
+    st.chat_message("assistant").write(msg)
