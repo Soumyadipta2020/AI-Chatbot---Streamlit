@@ -73,7 +73,7 @@ if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
     response = client.chat.completions.create(
         model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
         messages=st.session_state["messages"],
-        max_tokens=500
+        max_tokens=2000
     )
     msg = response.choices[0].message.content
     st.session_state["messages"].append({"role": "assistant", "content": msg})
