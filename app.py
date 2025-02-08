@@ -77,4 +77,17 @@ if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
     )
     msg = response.choices[0].message.content
     st.session_state["messages"].append({"role": "assistant", "content": msg})
-    st.chat_message("assistant").write(msg)
+    # Extract and format the intermediate thinking text
+    if "<think>" in msg and "</think>" in msg:
+        think_start = msg.index("<think>") + len("<think>")
+        think_end = msg.index("</think>")
+        think_text = msg[think_start:think_end]
+        msg = msg.replace(f"<think>{think_text}</think>", "")
+        # Display the thinking text with background color and heading
+        think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: blue;'>")
+        reply = f"**Thinking:**\n\n<span style='background-color: #01245c;'>{think_text}</span>" + "\n\n**Answer**\n\n" + msg
+    else:
+        reply = msg
+    # Render mathematical equations properly
+    reply = reply.replace("[", "$$").replace("]", "$$")
+    st.chat_message("assistant").markdown(reply, unsafe_allow_html=True)
