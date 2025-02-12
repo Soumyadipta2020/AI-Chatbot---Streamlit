@@ -1,17 +1,26 @@
+# ============================================================================ #
 # Import required libraries
+# ============================================================================ #
+
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 from openai import OpenAI
 import os
 
+# ============================================================================ #
 # Set HuggingFace API token from environment variable or local file
+# ============================================================================ #
+
 try:
     from api import HUGGINGFACE_API_TOKEN
 except ImportError:
     HUGGINGFACE_API_TOKEN = os.getenv("HUGGINGFACE_API_TOKEN")
 
+# ============================================================================ #
 # Define default questions for each business unit
+# ============================================================================ #
+
 default_questions = {
     "Business Unit 1": [
         "What are the sales trends?",
@@ -25,20 +34,32 @@ default_questions = {
     ],
 }
 
+# ============================================================================ #
 # Configure the Streamlit page layout
+# ============================================================================ #
+
 st.set_page_config(page_title="💬 Chatbot", layout="wide")
 
+# ============================================================================ #
 # Add a dropdown for selecting the business unit
+# ============================================================================ #
+
 selected_business_unit = st.sidebar.selectbox(
     "Select Business Unit:", list(default_questions.keys())
 )
 
+# ============================================================================ #
 # Display default questions in sidebar based on selected business unit
+# ============================================================================ #
+
 st.sidebar.title("Default Questions:")
 for question in default_questions[selected_business_unit]:
     st.sidebar.code(question, language=None)
 
+# ============================================================================ #
 # Handle file upload and data visualization
+# ============================================================================ #
+
 with st.sidebar:
     uploaded_file = st.file_uploader(
         "Upload a file", type=["csv", "xlsx", "png", "jpg"]
@@ -63,26 +84,41 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Error processing file: {e}")
 
+# ============================================================================ #
 # Initialize OpenAI client
+# ============================================================================ #
+
 client = OpenAI(
     base_url="https://api-inference.huggingface.co/v1/", 
     api_key=HUGGINGFACE_API_TOKEN
 )
 
+# ============================================================================ #
 # Display business unit header
+# ============================================================================ #
+
 st.header(selected_business_unit)
 
+# ============================================================================ #
 # Initiate chatbot conversation
+# ============================================================================ #
+
 if "messages" not in st.session_state:
     st.session_state["messages"] = [
         {"role": "assistant", "content": "How can I help you?"}
     ]
 
+# ============================================================================ #
 # Display chat messages
+# ============================================================================ #
+
 for msg in st.session_state["messages"]:
     st.chat_message(msg["role"]).write(msg["content"])
 
+# ============================================================================ #
 # Handle user input and generate response
+# ============================================================================ #
+
 if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
     # Add user message to chat history
     st.session_state["messages"].append({"role": "user", "content": prompt})
