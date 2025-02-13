@@ -120,9 +120,20 @@ for msg in st.session_state["messages"]:
 # ============================================================================ #
 
 if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
+    # Incorporate uploaded file context if available
+    file_context = ""
+    if uploaded_file is not None:
+        try:
+            # If the uploaded file was processed into a DataFrame (CSV or Excel), use its preview
+            file_context = f"Uploaded file preview ({uploaded_file.name}):\n{df.head().to_string()}\n"
+        except Exception:
+            # For other file types (like images), include basic file info
+            file_context = f"Uploaded file received: {uploaded_file.name}"
+    # Combine file context with the user's prompt if context exists
+    full_prompt = f"{file_context}\nUser's question: {prompt}" if file_context else prompt
     # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": prompt})
-    st.chat_message("user").write(prompt)
+    st.session_state["messages"].append({"role": "user", "content": full_prompt})
+    st.chat_message("user").write(full_prompt)
     # Generate response from OpenAI API
     response = client.chat.completions.create(
         model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
@@ -132,16 +143,14 @@ if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
     msg = response.choices[0].message.content
     # Add assistant response to chat history
     st.session_state["messages"].append({"role": "assistant", "content": msg})
-    # Extract and format the intermediate thinking text
+    # Extract and format the intermediate thinking text if available
     if "<think>" in msg and "</think>" in msg:
         think_start = msg.index("<think>") + len("<think>")
         think_end = msg.index("</think>")
         think_text = msg[think_start:think_end]
         msg = msg.replace(f"<think>{think_text}</think>", "")
-        # Display the thinking text with background color and heading
-        think_text = think_text.replace(
-            "\n", "</span>\n\n<span style='background-color: blue;'>"
-        )
+        # Format the thinking text with background color and heading
+        think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: blue;'>")
         reply = (
             f"**Thinking:**\n\n<span style='background-color: #01245c;'>{think_text}</span>"
             + "\n\n**Answer**\n\n"
