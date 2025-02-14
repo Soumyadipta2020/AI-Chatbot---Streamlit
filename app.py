@@ -5,8 +5,12 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from openai import OpenAI
 import os
+import logging
+from openai import OpenAI
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 
 # ============================================================================ #
 # Set HuggingFace API token from environment variable or local file
@@ -48,41 +52,61 @@ selected_business_unit = st.sidebar.selectbox(
     "Select Business Unit:", list(default_questions.keys())
 )
 
-# ============================================================================ #
-# Display default questions in sidebar based on selected business unit
-# ============================================================================ #
-
 st.sidebar.title("Default Questions:")
 for question in default_questions[selected_business_unit]:
     st.sidebar.code(question, language=None)
+
+if st.sidebar.button("Clear Chat History"):
+    st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
 
 # ============================================================================ #
 # Handle file upload and data visualization
 # ============================================================================ #
 
-with st.sidebar:
-    uploaded_file = st.file_uploader(
+@st.cache_data
+def process_uploaded_file(uploaded_file):
+    """
+    Process an uploaded file and return a DataFrame and a preview of the data.
+    Currently supports CSV and Excel files.
+    """
+    try:
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        elif uploaded_file.name.endswith(".xlsx"):
+            df = pd.read_excel(uploaded_file)
+        else:
+            # If it's an image, return None to indicate non-tabular data.
+            return None, None
+        return df, df.head()
+    except Exception as e:
+        logging.error("Failed to process file", exc_info=e)
+        raise e
+
+def handle_file_upload():
+    uploaded_file = st.sidebar.file_uploader(
         "Upload a file", type=["csv", "xlsx", "png", "jpg"]
     )
+    df = None
     if uploaded_file is not None:
-        try:
-            # Read and process different file types
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith(".xlsx"):
-                df = pd.read_excel(uploaded_file)
+        with st.spinner("Processing file..."):
+            if uploaded_file.name.endswith((".csv", ".xlsx")):
+                try:
+                    df, preview = process_uploaded_file(uploaded_file)
+                    st.write("Data Preview:")
+                    st.write(preview)
+                    st.write("Plot:")
+                    plt.figure()
+                    df.plot()
+                    st.pyplot(plt.gcf())
+                except Exception as e:
+                    st.error(f"Error processing file: {e}")
             else:
-                # Display uploaded image
+                # Handle image files
                 st.image(uploaded_file, caption="Uploaded Image", use_column_width=True)
-            # Display data preview and plot
-            st.write("Data Preview:")
-            st.write(df.head())
-            st.write("Plot:")
-            plt.figure()
-            df.plot()
-            st.pyplot(plt.gcf())
-        except Exception as e:
-            st.error(f"Error processing file: {e}")
+    return uploaded_file, df
+
+# Get file upload and corresponding dataframe (if any)
+uploaded_file, df = handle_file_upload()
 
 # ============================================================================ #
 # Initialize OpenAI client
@@ -103,61 +127,70 @@ st.header(selected_business_unit)
 # Initiate chatbot conversation
 # ============================================================================ #
 
-if "messages" not in st.session_state:
-    st.session_state["messages"] = [
-        {"role": "assistant", "content": "How can I help you?"}
-    ]
+def initialize_chat():
+    if "messages" not in st.session_state:
+        st.session_state["messages"] = [{"role": "assistant", "content": "How can I help you?"}]
+    for msg in st.session_state["messages"]:
+        st.chat_message(msg["role"]).write(msg["content"])
 
-# ============================================================================ #
-# Display chat messages
-# ============================================================================ #
-
-for msg in st.session_state["messages"]:
-    st.chat_message(msg["role"]).write(msg["content"])
-
-# ============================================================================ #
-# Handle user input and generate response
-# ============================================================================ #
-
-if prompt := st.chat_input(f"Type your question for {selected_business_unit}"):
-    # Incorporate uploaded file context if available
-    file_context = ""
-    if uploaded_file is not None:
+def handle_new_chat_message():
+    prompt = st.chat_input(f"Type your question for {selected_business_unit}")
+    if prompt:
+        # Incorporate uploaded file context if available
+        file_context = ""
+        if uploaded_file is not None:
+            try:
+                if df is not None:
+                    file_context = f"Uploaded file preview ({uploaded_file.name}):\n{df.head().to_string()}\n"
+                else:
+                    file_context = f"Uploaded file received: {uploaded_file.name}"
+            except Exception:
+                file_context = f"Uploaded file received: {uploaded_file.name}"
+        full_prompt = f"{file_context}\nUser's question: {prompt}" if file_context else prompt
+        # Append user’s message and display it
+        st.session_state["messages"].append({"role": "user", "content": full_prompt})
+        st.chat_message("user").write(full_prompt)
+        # Generate response from the API
         try:
-            # If the uploaded file was processed into a DataFrame (CSV or Excel), use its preview
-            file_context = f"Uploaded file preview ({uploaded_file.name}):\n{df.head().to_string()}\n"
-        except Exception:
-            # For other file types (like images), include basic file info
-            file_context = f"Uploaded file received: {uploaded_file.name}"
-    # Combine file context with the user's prompt if context exists
-    full_prompt = f"{file_context}\nUser's question: {prompt}" if file_context else prompt
-    # Add user message to chat history
-    st.session_state["messages"].append({"role": "user", "content": full_prompt})
-    st.chat_message("user").write(full_prompt)
-    # Generate response from OpenAI API
-    response = client.chat.completions.create(
-        model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
-        messages=st.session_state["messages"],
-        max_tokens=2000,
-    )
-    msg = response.choices[0].message.content
-    # Add assistant response to chat history
-    st.session_state["messages"].append({"role": "assistant", "content": msg})
-    # Extract and format the intermediate thinking text if available
-    if "<think>" in msg and "</think>" in msg:
-        think_start = msg.index("<think>") + len("<think>")
-        think_end = msg.index("</think>")
-        think_text = msg[think_start:think_end]
-        msg = msg.replace(f"<think>{think_text}</think>", "")
-        # Format the thinking text with background color and heading
-        think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: blue;'>")
-        reply = (
+            response = client.chat.completions.create(
+                model="deepseek-ai/DeepSeek-R1-Distill-Qwen-32B",
+                messages=st.session_state["messages"],
+                max_tokens=2000,
+            )
+            msg = response.choices[0].message.content
+        except Exception as e:
+            st.error(f"Error generating response: {e}")
+            logging.error("Chat API error", exc_info=e)
+            return
+        # Append assistant response and format if intermediate thinking is provided
+        st.session_state["messages"].append({"role": "assistant", "content": msg})
+        # Format response with think block if present
+        if "<think>" in msg or "</think>" in msg:
+            if "<think>" in msg and "</think>" in msg:
+                think_start = msg.index("<think>") + len("<think>")
+                think_end = msg.index("</think>")
+                think_text = msg[think_start:think_end]
+                msg = msg.replace(f"<think>{think_text}</think>", "")
+            elif "</think>" in msg and "<think>" not in msg:
+                think_end = msg.index("</think>")
+                think_text = msg[:think_end]
+                msg = msg.replace(f"{think_text}</think>", "")
+            think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: #01245c;'>")
+            reply = (
             f"**Thinking:**\n\n<span style='background-color: #01245c;'>{think_text}</span>"
-            + "\n\n**Answer**\n\n"
-            + msg
-        )
-    else:
-        reply = msg
-    # Render mathematical equations properly (if any)
-    reply = reply.replace("[", "$$").replace("]", "$$")
-    st.chat_message("assistant").markdown(reply, unsafe_allow_html=True)
+            "\n\n**Answer**\n\n" + msg
+            )
+            print("Message with think")
+        else:
+            reply = msg
+            print("Message without think")
+        # Format reply for final display
+        reply = reply.replace("[", "$$").replace("]", "$$")
+        # Display assistant response
+        st.chat_message("assistant").markdown(reply, unsafe_allow_html=True)
+
+# Initialize chat and render previous messages
+initialize_chat()
+
+# Handle new chat user input
+handle_new_chat_message()
