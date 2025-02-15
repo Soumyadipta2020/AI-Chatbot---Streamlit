@@ -175,9 +175,9 @@ def handle_new_chat_message():
                 think_end = msg.index("</think>")
                 think_text = msg[:think_end]
                 msg = msg.replace(f"{think_text}</think>", "")
-            think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: blue;'>")
+            think_text = think_text.replace("\n", "</span>\n\n<span style='background-color: #528df2;'>")
             reply = (
-            f"**Thinking:**\n\n<span style='background-color: blue;'>{think_text}</span>"
+            f"**Thinking:**\n\n<span style='background-color: #528df2;'>{think_text}</span>"
             "\n\n**Answer**\n\n" + msg
             )
             print("Message with think")
