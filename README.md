@@ -9,17 +9,6 @@ This repository hosts an AI Chatbot application built using the [Streamlit](http
 - **User-Friendly Interface**: A clean and intuitive UI powered by Streamlit.
 - **Customizable Responses**: Modify the chatbot's behavior and responses to suit your needs.
 
-## Video Demo
-
-Watch the demo video below to see the chatbot in action:
-
-<video width="100%" controls>
-  <source src="demo.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-
-> Note: If the video does not play, please ensure that your browser supports the HTML5 video element or download the video [here](demo.mp4).
-
 ## Getting Started 🚀
 
 Follow these instructions to set up and run the project locally.
