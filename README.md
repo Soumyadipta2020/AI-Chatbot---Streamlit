@@ -14,7 +14,7 @@ This repository hosts an AI Chatbot application built using the [Streamlit](http
 Watch the demo video below to see the chatbot in action:
 
 <video width="100%" controls>
-  <source src="demo.mp4" type="video/mp4">
+  <source src="www/demo.mp4" type="video/mp4">
   Your browser does not support the video tag.
 </video>
 
